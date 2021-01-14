@@ -25,6 +25,12 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
+      #For javafx.util
+      - name: Install openjfx
+        run: |
+          sudo apt update
+          sudo apt install openjfx
+                          
       # Runs a single command using the runners shell
       - name: Clean build and unit test
         run: ./gradlew clean build --scan --no-daemon --info
