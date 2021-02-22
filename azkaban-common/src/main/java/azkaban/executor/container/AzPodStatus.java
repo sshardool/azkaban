@@ -1,17 +1,23 @@
 package azkaban.executor.container;
 
 //
-// Dispatched --> InitContainersRunning --> AppContainersRunning --> Completed
-//    |                  |
-//    |                  |
-//    '-->  InitError <--'
 //
-public enum AzPodState {
+//  Unset
+//    |
+// Scheduled --> InitContainersRunning --> AppContainersStarting --> Ready --> Completed
+//    |                   |                   |                        |
+//    |                   |                   |                        |
+//    '--> InitFailure <--'                   '-----> AppFailure <-----'
+//
+public enum AzPodStatus {
   AZ_POD_UNSET,
-  AZ_POD_DISPATCHED,
+  AZ_POD_REQUESTED,
+  AZ_POD_SCHEDULED,
   AZ_POD_INIT_CONTAINERS_RUNNING,
-  AZ_POD_APP_CONTAINERS_RUNNING,
+  AZ_POD_APP_CONTAINERS_STARTING,
+  AZ_POD_READY,
   AZ_POD_COMPLETED,
-  AZ_POD_INIT_ERROR,
-  AZ_POD_APP_ERROR
+  AZ_POD_INIT_FAILURE,
+  AZ_POD_APP_FAILURE,
+  AZ_POD_UNEXPECTED;
 }
