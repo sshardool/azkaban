@@ -24,9 +24,13 @@ import azkaban.DispatchMethod;
 import azkaban.executor.ExecutionController;
 import azkaban.executor.ExecutorManager;
 import azkaban.executor.ExecutorManagerAdapter;
+import azkaban.executor.container.AzPodStatusDriver;
 import azkaban.executor.container.ContainerizedDispatchManager;
 import azkaban.executor.container.ContainerizedImpl;
 import azkaban.executor.container.ContainerizedImplType;
+import azkaban.executor.container.KubernetesWatch;
+import azkaban.executor.container.KubernetesWatch.PodWatchParams;
+import azkaban.executor.container.RawPodWatchEventListener;
 import azkaban.flowtrigger.database.FlowTriggerInstanceLoader;
 import azkaban.flowtrigger.database.JdbcFlowTriggerInstanceLoaderImpl;
 import azkaban.flowtrigger.plugin.FlowTriggerDependencyPluginException;
@@ -101,6 +105,7 @@ public class AzkabanWebServerModule extends AbstractModule {
     bind(ExecutorManagerAdapter.class).to(resolveExecutorManagerAdaptorClassType());
     bind(WebMetrics.class).to(resolveWebMetricsClass()).in(Scopes.SINGLETON);
     bindImageManagementDependencies();
+    bindContainerWatchDependencies();
   }
 
   private Class<? extends ContainerizedImpl> resolveContainerizedImpl() {
@@ -145,6 +150,22 @@ public class AzkabanWebServerModule extends AbstractModule {
     return DispatchMethod.isContainerizedMethodEnabled(props
         .getString(Constants.ConfigurationKeys.AZKABAN_EXECUTION_DISPATCH_METHOD,
             DispatchMethod.PUSH.name()));
+  }
+
+  private void bindContainerWatchDependencies() {
+    if(!isContainerizedDispatchMethodEnabled()) {
+      return;
+    }
+    bind(KubernetesWatch.class).in(Scopes.SINGLETON);
+    bind(RawPodWatchEventListener.class).to(AzPodStatusDriver.class).in(Scopes.SINGLETON);
+  }
+
+  @Inject
+  @Singleton
+  @Provides
+  private PodWatchParams setupPodWatchParams() {
+    // todo: read this from config instead
+    return new PodWatchParams("cop-dev", null);
   }
 
   @Inject

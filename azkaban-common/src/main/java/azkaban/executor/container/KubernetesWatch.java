@@ -15,10 +15,18 @@ import io.kubernetes.client.util.Watch;
 import io.kubernetes.client.util.Watch.Response;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import okhttp3.OkHttpClient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * Provides primitives for 'watching' change capture events of kubernetes resources.
+ * This is currently aimed at the monitoring the state changes of FlowContainer pods, but can be
+ * extended for including other Kubernetes resources.
+ */
+@Singleton
 public class KubernetesWatch {
   private static final Logger logger = LoggerFactory.getLogger(KubernetesWatch.class);
   private final ApiClient client;
@@ -27,6 +35,7 @@ public class KubernetesWatch {
   private Watch<V1Pod> podWatch;
   private RawPodWatchEventListener podWatchEventListener;
 
+  @Inject
   public KubernetesWatch(KubeConfig kubeConfig,
       RawPodWatchEventListener podWatchEventListener,
       PodWatchParams podWatchParams)throws ExecutorManagerException {
@@ -61,15 +70,22 @@ public class KubernetesWatch {
     this(kubeConfig, podWatchEventListener, new PodWatchParams(null, null));
   }
 
+  /**
+   * Create the Pod watch and set it up for creating parsed representations of the JSON
+   * responses received from the Kubernetes API server. Responses will be converted to type
+   * {@code Watch.Response<V1Pod>}.
+   * Creating the watch submits the request the API server but does not block beyond that.
+   * @throws ExecutorManagerException
+   */
   public void initializePodWatch() throws ExecutorManagerException {
     try {
       this.podWatch = Watch.createWatch(this.client,
-          coreV1Api.listNamespacedPodCall("cop-dev", //podWatchParams.getNamespace(),
+          coreV1Api.listNamespacedPodCall(podWatchParams.getNamespace(),
               "true",
               false,
               null,
               null,
-              null, // podWatchParams.getLabelSelector(),
+              podWatchParams.getLabelSelector(),
               null,
               null,
               null,
@@ -89,6 +105,12 @@ public class KubernetesWatch {
     }
   }
 
+  /**
+   * This starts the continuous event processing loop for fetching the pod watch events.
+   * Processing of the events is callback driven and the registered {@code RawPodWatchEventListener}
+   * provides the processing implementation.
+   * @throws IOException
+   */
   public void startPodWatch() throws IOException {
     requireNonNull(podWatch, "watch must be initialized");
     try {
@@ -99,6 +121,9 @@ public class KubernetesWatch {
     }
   }
 
+  /**
+   * Parameters used for setting up the Pod watch.
+   */
   public static class PodWatchParams {
     private final String namespace;
     private final String labelSelector;

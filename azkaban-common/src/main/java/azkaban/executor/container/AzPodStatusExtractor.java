@@ -2,7 +2,6 @@ package azkaban.executor.container;
 
 import static java.util.Objects.requireNonNull;
 
-import com.google.common.collect.ImmutableMap;
 import io.kubernetes.client.openapi.models.V1ContainerStatus;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodCondition;
@@ -13,33 +12,38 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.BooleanSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- *  AZ_POD_SCHEDULED,
+ * Given an event of type {@code Watch.Response<V1Pod>} this class is useful for deriving
+ * corresponding {@code AzPodStatus}. The states have the following interpretation.
+ *
+ *  AZ_POD_REQUESTED
+ *  PodScheduled is missing or false.
+ *
+ *  AZ_POD_SCHEDULED
  *  PodScheduled is true, other conditions are missing or false, no init-containers running or
  *  completed.
  *
  *  AZ_POD_INIT_CONTAINERS_RUNNING,
  *  PodScheduled is true, Initialized is false, at least 1 init-container running.
  *
- *  AZ_POD_APP_CONTAINERS_STARTING,
- *  Initialized is true, at least 1 application container running.
+ *  AZ_POD_APP_CONTAINERS_STARTING
+ *  Initialized is true, but all application containers are waiting.
  *
- *  AZ_POD_READY,
+ *  AZ_POD_READY
  *  ContainersReady is true, Ready is true. In absence of readiness gates both of these
  *  conditions are identical. We can consider splitting the AZ_POD_READY into 2 separate states
  *  if readiness gates are introduced and need to be accounted for in future.
  *
- *  AZ_POD_COMPLETED,
+ *  AZ_POD_COMPLETED
  *  Phase is Succeeded.
  *
- *  AZ_POD_INIT_ERROR,
+ *  AZ_POD_INIT_ERROR
  *  Phase is Failed. At least 1 init-container terminated with failure.
  *
- *  AZ_POD_APP_ERROR,
+ *  AZ_POD_APP_ERROR
  *  Phase is Failed. At least 1 application container terminated with failure.
  *
  *  AZ_POD_UNEXPECTED
@@ -50,7 +54,7 @@ import org.slf4j.LoggerFactory;
 public class AzPodStatusExtractor {
   private static final Logger logger = LoggerFactory.getLogger(AzPodStatusExtractor.class);
 
-  private final Watch.Response<V1Pod> podWatchResponse;
+  private final Watch.Response<V1Pod> podWatchEvent;
   private final V1Pod v1Pod;
   private final V1PodStatus v1PodStatus;
   private final List<V1PodCondition> podConditions;
@@ -64,11 +68,11 @@ public class AzPodStatusExtractor {
   private Optional<PodConditionStatus> readyConditionStatus = Optional.empty();
   private PodPhase podPhase;
 
-  public AzPodStatusExtractor(Response<V1Pod> podWatchResponse) {
-    requireNonNull(podWatchResponse, "pod watch response must not be null");
-    requireNonNull(podWatchResponse.object, "watch v1Pod must not be null");
-    this.podWatchResponse = podWatchResponse;
-    this.v1Pod = (V1Pod)podWatchResponse.object;
+  public AzPodStatusExtractor(Response<V1Pod> podWatchEvent) {
+    requireNonNull(podWatchEvent, "pod watch response must not be null");
+    requireNonNull(podWatchEvent.object, "watch v1Pod must not be null");
+    this.podWatchEvent = podWatchEvent;
+    this.v1Pod = (V1Pod) podWatchEvent.object;
 
     requireNonNull(v1Pod.getStatus(), "pod status must not be null");
     requireNonNull(v1Pod.getStatus().getPhase(), "pod phase must not be null");
@@ -80,6 +84,58 @@ public class AzPodStatusExtractor {
       extractConditionStatuses();
     }
     extractPhase();
+  }
+
+  public Response<V1Pod> getPodWatchEvent() {
+    return podWatchEvent;
+  }
+
+  public V1Pod getV1Pod() {
+    return v1Pod;
+  }
+
+  public V1PodStatus getV1PodStatus() {
+    return v1PodStatus;
+  }
+
+  public List<V1PodCondition> getPodConditions() {
+    return podConditions;
+  }
+
+  public Optional<V1PodCondition> getScheduledCondition() {
+    return scheduledCondition;
+  }
+
+  public Optional<V1PodCondition> getContainersReadyCondition() {
+    return containersReadyCondition;
+  }
+
+  public Optional<V1PodCondition> getInitializedCondition() {
+    return initializedCondition;
+  }
+
+  public Optional<V1PodCondition> getReadyCondition() {
+    return readyCondition;
+  }
+
+  public Optional<PodConditionStatus> getScheduledConditionStatus() {
+    return scheduledConditionStatus;
+  }
+
+  public Optional<PodConditionStatus> getContainersReadyConditionStatus() {
+    return containersReadyConditionStatus;
+  }
+
+  public Optional<PodConditionStatus> getInitializedConditionStatus() {
+    return initializedConditionStatus;
+  }
+
+  public Optional<PodConditionStatus> getReadyConditionStatus() {
+    return readyConditionStatus;
+  }
+
+  public PodPhase getPodPhase() {
+    return podPhase;
   }
 
   private void extractConditions() {
@@ -193,7 +249,6 @@ public class AzPodStatusExtractor {
       logger.debug("InitRunning false as initialized condition is true");
       return false;
     }
-    // todo: at least 1 init container running
     logger.debug("InitRunning is true");
     return true;
   }
@@ -317,13 +372,10 @@ public class AzPodStatusExtractor {
   }
 
   /**
-   *
+   * Return the {@code AzPodStatus} derived from given Pod watch event.
    * @return
    */
   public AzPodStatus createAzPodStatus() {
-//    final Map<AzPodStatus, BooleanSupplier> methodAzPodStatusMap = ImmutableMap.builder()
-//        .put(AzPodStatus.AZ_POD_SCHEDULED, this::checkForAzPodScheduled)
-//        .build();
     if (checkForAzPodScheduled()) {
       return AzPodStatus.AZ_POD_REQUESTED;
     }
@@ -342,6 +394,7 @@ public class AzPodStatusExtractor {
     if (checkForAzPodCompleted()) {
       return AzPodStatus.AZ_POD_COMPLETED;
     }
+    // todo: failure condition checks are not complete
     if (checkForAzPodInitFailure()) {
       return AzPodStatus.AZ_POD_INIT_FAILURE;
     }
@@ -357,11 +410,18 @@ public class AzPodStatusExtractor {
    * @param event
    * @return
    */
-  public static AzPodStatusWithEvent azPodStatusFromEvent(Watch.Response<V1Pod> event) {
-    AzPodStatusExtractor extractor = new AzPodStatusExtractor(event);
-    return new AzPodStatusWithEvent(extractor.createAzPodStatus(), event);
+  public static AzPodStatusMetadata azPodStatusFromEvent(Watch.Response<V1Pod> event) {
+    return new AzPodStatusMetadata(new AzPodStatusExtractor(event));
   }
 
+  /**
+   * Enum of all supported Condition names.
+   * https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
+   *
+   * Unfortunately these values don't appear to be directly provided as enums in the kubernetes
+   * client. (The only relevant references are for the grpc client supported values). Declaring
+   * these values as enums is cleaner than than using string literals.
+   */
   private enum PodCondition {
     PodScheduled,
     ContainersReady,
@@ -369,12 +429,20 @@ public class AzPodStatusExtractor {
     Ready
   }
 
+  /**
+   * Enum of all supported Condition statuses.
+   * https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
+   */
   private enum PodConditionStatus {
     True,
     False,
     Unknown
   }
 
+  /**
+   * Enum of all supported Pod phases.
+   * https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-and-container-status
+   */
   private enum PodPhase {
     Pending,
     Running,

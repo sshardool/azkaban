@@ -6,23 +6,25 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.util.Watch;
-import io.kubernetes.client.util.Watch.Response;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
+import javax.inject.Inject;
+import javax.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+@Singleton
 public class AzPodStatusDriver implements RawPodWatchEventListener {
   private static final Logger logger = LoggerFactory.getLogger(AzPodStatusDriver.class);
 
   private static final int THREAD_POOL_SIZE = 4;
   private final ExecutorService executor;
-  private final List<AzPodStatusListener> listeners = new ArrayList<>();
-  private final ImmutableMap<AzPodStatus, List<Consumer<Response<V1Pod>>>> listenerMap;
+  private final ImmutableMap<AzPodStatus, List<Consumer<AzPodStatusMetadata>>> listenerMap;
 
+  @Inject
   public AzPodStatusDriver() {
     executor = Executors.newFixedThreadPool(THREAD_POOL_SIZE,
         new ThreadFactoryBuilder().setNameFormat("azk-watch-pool-%d").build());
@@ -40,66 +42,8 @@ public class AzPodStatusDriver implements RawPodWatchEventListener {
     listenerMap = listenerMapBuilder.build();
   }
 
-  private void notifyListeners(AzPodStatusWithEvent statusWithEvent) {
-    //todo: replace null with correct Watch.Response<>
-    listenerMap.get(statusWithEvent.getAzPodStatus()).stream()
-        .forEach(consumer -> consumer.accept(statusWithEvent.getPodWatchEvent()));
-//    if (status == AzPodStatus.AZ_POD_REQUESTED) {
-//      listeners.stream().forEach(listener -> listener.OnPodRequested(null));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_SCHEDULED) {
-//      listeners.stream().forEach(listener -> executor.submit(() -> listener.OnPodScheduled(null)));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_INIT_CONTAINERS_RUNNING) {
-//      listeners.stream().forEach(listener -> listener.OnPodInitContainersRunning(null));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_APP_CONTAINERS_STARTING) {
-//      listeners.stream().forEach(listener -> listener.OnPodAppContainersStarting(null));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_READY) {
-//      listeners.stream().forEach(listener -> listener.OnPodReady(null));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_COMPLETED) {
-//      listeners.stream().forEach(listener -> listener.OnPodCompleted(null));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_INIT_FAILURE) {
-//      listeners.stream().forEach(listener -> listener.OnPodInitFailure(null));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_APP_FAILURE) {
-//      listeners.stream().forEach(listener -> listener.OnPodAppFailure(null));
-//      return;
-//    }
-//    if (status == AzPodStatus.AZ_POD_UNEXPECTED) {
-//      listeners.stream().forEach(listener -> listener.OnPodUnexpected(null));
-//      return;
-//    }
-  }
-
-  @Override
-  public void onEvent(Watch.Response<V1Pod> watchEvent) {
-    logPodWatchEvent(watchEvent);
-    try {
-      AzPodStatusWithEvent azPodStatusWithEvent = AzPodStatusExtractor.azPodStatusFromEvent(watchEvent);
-      notifyListeners(azPodStatusWithEvent);
-    } catch (Exception e) {
-      logger.error("Unexepcted exception while processing pod watch event.", e);
-    }
-  }
-
-  private static void logPodWatchEvent(Watch.Response<V1Pod> watchEvent) {
-    //todo
-  }
-
   private void registerAzPodStatusListener(AzPodStatusListener listener) {
     requireNonNull(listener, "listener must not be null");
-//    listeners.add(listener);
     listenerMap.get(AzPodStatus.AZ_POD_REQUESTED).add(listener::OnPodRequested);
     listenerMap.get(AzPodStatus.AZ_POD_SCHEDULED).add(listener::OnPodScheduled);
     listenerMap.get(AzPodStatus.AZ_POD_INIT_CONTAINERS_RUNNING).add(listener::OnPodInitContainersRunning);
@@ -110,5 +54,28 @@ public class AzPodStatusDriver implements RawPodWatchEventListener {
     listenerMap.get(AzPodStatus.AZ_POD_APP_FAILURE).add(listener::OnPodAppFailure);
     listenerMap.get(AzPodStatus.AZ_POD_UNEXPECTED).add(listener::OnPodUnexpected);
 
+  }
+
+  private void deliverCallbacksForEvent(AzPodStatusMetadata podStatusMetadata) {
+    listenerMap.get(podStatusMetadata.getAzPodStatus()).stream()
+        .forEach(callback -> executor.execute(() -> callback.accept(podStatusMetadata)));
+  }
+
+  @Override
+  public void onEvent(Watch.Response<V1Pod> watchEvent) {
+    // Technically, logging the pod watch event can also be performed as part of a callback.
+    // For now the logging is inline to ensure the the event is logged before any corresponding
+    // callbacks and are invoked.
+    logPodWatchEvent(watchEvent);
+    try {
+      AzPodStatusMetadata azPodStatusMetadata = AzPodStatusExtractor.azPodStatusFromEvent(watchEvent);
+      deliverCallbacksForEvent(azPodStatusMetadata);
+    } catch (Exception e) {
+      logger.error("Unexepcted exception while processing pod watch event.", e);
+    }
+  }
+
+  private static void logPodWatchEvent(Watch.Response<V1Pod> watchEvent) {
+    //todo
   }
 }
