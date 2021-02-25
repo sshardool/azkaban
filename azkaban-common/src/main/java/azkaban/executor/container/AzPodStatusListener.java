@@ -1,16 +1,21 @@
 package azkaban.executor.container;
 
-import io.kubernetes.client.openapi.models.V1Pod;
-import io.kubernetes.client.util.Watch;
-
+/**
+ * Provides callback methods for processing of {@code AzPodStatus} states.
+ * Each of the methods here directly corresponds to an enum value in{@code AzPodStatus}
+ *
+ * Method implementations are expected to be idempotent as it's possible to receive different
+ * events which all map to the same enum value in {@code AzPodStatus}
+ *
+ */
 public interface AzPodStatusListener {
-  default void OnPodRequested(AzPodStatusMetadata event) {}
-  default void OnPodScheduled(AzPodStatusMetadata event) {}
-  default void OnPodInitContainersRunning(AzPodStatusMetadata event) {}
-  default void OnPodAppContainersStarting(AzPodStatusMetadata event) {}
-  default void OnPodReady(AzPodStatusMetadata event) {}
-  default void OnPodCompleted(AzPodStatusMetadata event) {}
-  default void OnPodInitFailure(AzPodStatusMetadata event) {}
-  default void OnPodAppFailure(AzPodStatusMetadata event) {}
-  default void OnPodUnexpected(AzPodStatusMetadata event) {}
+  default void onPodRequested(AzPodStatusMetadata event) {}
+  default void onPodScheduled(AzPodStatusMetadata event) {}
+  default void onPodInitContainersRunning(AzPodStatusMetadata event) {}
+  default void onPodAppContainersStarting(AzPodStatusMetadata event) {}
+  default void onPodReady(AzPodStatusMetadata event) {}
+  default void onPodCompleted(AzPodStatusMetadata event) {}
+  default void onPodInitFailure(AzPodStatusMetadata event) {}
+  default void onPodAppFailure(AzPodStatusMetadata event) {}
+  default void onPodUnexpected(AzPodStatusMetadata event) {}
 }

@@ -1,6 +1,12 @@
 package azkaban.executor.container;
 
 
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+
 /**
  * The Enum represents the different stages of the pod lifecycle.
  * While the Kubernetes API can provide very granular information about the current states
@@ -24,6 +30,7 @@ package azkaban.executor.container;
  *     |                   |                   |                        |          |
  *     |                   |                   |                        |          |
  *     '--> InitFailure <--'                   '-----> AppFailure <-----'          '--> Deleted
+ *
  */
 public enum AzPodStatus {
   AZ_POD_UNSET,

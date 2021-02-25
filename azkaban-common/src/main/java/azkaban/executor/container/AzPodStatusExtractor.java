@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * //todo: (1) highlight state tags (2) Design doc in rst (3) simple debug scripts
  * Given an event of type {@code Watch.Response<V1Pod>} this class is useful for deriving
  * corresponding {@code AzPodStatus}. The states have the following interpretation.
  *
@@ -26,7 +27,7 @@ import org.slf4j.LoggerFactory;
  *  PodScheduled is true, other conditions are missing or false, no init-containers running or
  *  completed.
  *
- *  AZ_POD_INIT_CONTAINERS_RUNNING,
+ *  AZ_POD_INIT_CONTAINERS_RUNNING
  *  PodScheduled is true, Initialized is false, at least 1 init-container running.
  *
  *  AZ_POD_APP_CONTAINERS_STARTING
@@ -58,6 +59,7 @@ public class AzPodStatusExtractor {
   private final V1Pod v1Pod;
   private final V1PodStatus v1PodStatus;
   private final List<V1PodCondition> podConditions;
+  private final String podName;
   private Optional<V1PodCondition> scheduledCondition = Optional.empty();
   private Optional<V1PodCondition> containersReadyCondition = Optional.empty();
   private Optional<V1PodCondition> initializedCondition = Optional.empty();
@@ -72,7 +74,8 @@ public class AzPodStatusExtractor {
     requireNonNull(podWatchEvent, "pod watch response must not be null");
     requireNonNull(podWatchEvent.object, "watch v1Pod must not be null");
     this.podWatchEvent = podWatchEvent;
-    this.v1Pod = (V1Pod) podWatchEvent.object;
+    this.v1Pod = podWatchEvent.object;
+    this.podName = this.v1Pod.getMetadata().getName();
 
     requireNonNull(v1Pod.getStatus(), "pod status must not be null");
     requireNonNull(v1Pod.getStatus().getPhase(), "pod phase must not be null");
@@ -96,6 +99,10 @@ public class AzPodStatusExtractor {
 
   public V1PodStatus getV1PodStatus() {
     return v1PodStatus;
+  }
+
+  public String getPodName() {
+    return podName;
   }
 
   public List<V1PodCondition> getPodConditions() {
@@ -376,7 +383,7 @@ public class AzPodStatusExtractor {
    * @return
    */
   public AzPodStatus createAzPodStatus() {
-    if (checkForAzPodScheduled()) {
+    if (checkForAzPodRequested()) {
       return AzPodStatus.AZ_POD_REQUESTED;
     }
     if (checkForAzPodScheduled()) {
@@ -420,7 +427,7 @@ public class AzPodStatusExtractor {
    *
    * Unfortunately these values don't appear to be directly provided as enums in the kubernetes
    * client. (The only relevant references are for the grpc client supported values). Declaring
-   * these values as enums is cleaner than than using string literals.
+   * these values as enums is cleaner than using string literals.
    */
   private enum PodCondition {
     PodScheduled,

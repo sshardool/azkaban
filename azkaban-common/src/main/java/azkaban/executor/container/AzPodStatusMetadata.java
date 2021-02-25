@@ -20,17 +20,23 @@ public class AzPodStatusMetadata {
   private static final Logger logger = LoggerFactory.getLogger(AzPodStatusMetadata.class);
 
   private final AzPodStatus azPodStatus;
+  private final String podName;
   private final Watch.Response<V1Pod> podWatchEvent;
   private final Optional<FlowPodMetadata> flowPodMetadata;
 
   public AzPodStatusMetadata(AzPodStatusExtractor extractor) {
     this.azPodStatus = extractor.createAzPodStatus();
+    this.podName = extractor.getPodName();
     this.podWatchEvent = extractor.getPodWatchEvent();
     this.flowPodMetadata = FlowPodMetadata.extract(extractor);
   }
 
   public AzPodStatus getAzPodStatus() {
     return azPodStatus;
+  }
+
+  public String getPodName() {
+    return podName;
   }
 
   public Watch.Response<V1Pod> getPodWatchEvent() {

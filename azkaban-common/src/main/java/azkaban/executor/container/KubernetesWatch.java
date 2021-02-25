@@ -75,6 +75,7 @@ public class KubernetesWatch {
    * responses received from the Kubernetes API server. Responses will be converted to type
    * {@code Watch.Response<V1Pod>}.
    * Creating the watch submits the request the API server but does not block beyond that.
+   *
    * @throws ExecutorManagerException
    */
   public void initializePodWatch() throws ExecutorManagerException {
