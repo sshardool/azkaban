@@ -1,11 +1,4 @@
-package azkaban.executor.container;
-
-
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+package azkaban.executor.container.watch;
 
 /**
  * The Enum represents the different stages of the pod lifecycle.
@@ -30,6 +23,7 @@ import java.util.Set;
  *     |                   |                   |                        |          |
  *     |                   |                   |                        |          |
  *     '--> InitFailure <--'                   '-----> AppFailure <-----'          '--> Deleted
+ *
  *
  */
 public enum AzPodStatus {

@@ -1,16 +1,16 @@
-package azkaban.executor.container;
+package azkaban.executor.container.watch;
 
-import static azkaban.executor.container.AzPodStatus.AZ_POD_APP_CONTAINERS_STARTING;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_APP_FAILURE;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_COMPLETED;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_DELETED;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_INIT_CONTAINERS_RUNNING;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_INIT_FAILURE;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_READY;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_REQUESTED;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_SCHEDULED;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_UNEXPECTED;
-import static azkaban.executor.container.AzPodStatus.AZ_POD_UNSET;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_APP_CONTAINERS_STARTING;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_APP_FAILURE;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_COMPLETED;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_DELETED;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_INIT_CONTAINERS_RUNNING;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_INIT_FAILURE;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_READY;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_REQUESTED;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_SCHEDULED;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_UNEXPECTED;
+import static azkaban.executor.container.watch.AzPodStatus.AZ_POD_UNSET;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;

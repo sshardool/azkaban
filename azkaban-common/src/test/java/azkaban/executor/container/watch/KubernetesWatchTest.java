@@ -1,4 +1,4 @@
-package azkaban.executor.container;
+package azkaban.executor.container.watch;
 
 import static java.util.Objects.requireNonNull;
 
@@ -42,6 +42,68 @@ public class KubernetesWatchTest {
       AzPodStatus.AZ_POD_APP_CONTAINERS_STARTING,
       AzPodStatus.AZ_POD_READY,
       AzPodStatus.AZ_POD_COMPLETED);
+
+  // todo: sanitize and package json files as resources
+  private static String KUBE_CONFIG_PATH = "/Users/sshardoo/.kube/proxy-config";
+  private static String JSON_EVENTS_FILE_PATH = "/Users/sshardoo/source/misc/sample5-pods.json";
+  private static String POD_WITH_LIFECYCLE_SUCCESS = "fc-dep-holdem6-280";
+  private static String POD_WITH_LIFECYCLE_INIT_FAILURE = "";
+  private static String POD_WITH_LIFECYCLE_APP_FAILURE = "";
+  private static String POD_WTIH_COMPLETED_STATE = "fc-dep-holdem6-238";
+
+  private KubeConfig kubeConfig;
+  private KubernetesWatch kubeWatchWithMockListener;
+
+  @Before
+  public void setUp() throws Exception {
+    this.kubeConfig = KubeConfig.loadKubeConfig(
+        Files.newBufferedReader(Paths.get(KUBE_CONFIG_PATH), Charset.defaultCharset()));
+    this.kubeWatchWithMockListener = new KubernetesWatch(kubeConfig, new MockPodWatchEventListener(), NAMESPACE,
+        null);
+  }
+
+  @Test
+  public void testDriverWithStatusLoggingListener() throws Exception {
+    StatusLoggingListener podStatusListener = new StatusLoggingListener();
+    AzPodStatusDriver azPodStatusDriver = new AzPodStatusDriver();
+    azPodStatusDriver.registerAzPodStatusListener(podStatusListener);
+    KubernetesWatch watchWithLoggingListener = new KubernetesWatch(kubeConfig,
+        azPodStatusDriver,
+        NAMESPACE,
+        null);
+    ApiClient apiClient = ClientBuilder.kubeconfig(kubeConfig).build();
+    FileBackedWatch<V1Pod> fileBackedWatch = new FileBackedWatch<>(
+        apiClient.getJSON(),
+        new TypeToken<Response<V1Pod>>() {}.getType(),
+        Paths.get(JSON_EVENTS_FILE_PATH));
+    watchWithLoggingListener.processPodWatchEvents(fileBackedWatch);
+    azPodStatusDriver.shutdown();
+
+    ConcurrentMap<String, Queue<AzPodStatus>> statusLogMap = podStatusListener.getStatusLogMap();
+    StatusLoggingListener.logDebugStatusMap(statusLogMap);
+
+    List<AzPodStatus> actualLifecycleStates =
+        statusLogMap.get(POD_WITH_LIFECYCLE_SUCCESS).stream()
+        .distinct().collect(Collectors.toList());
+
+    Assert.assertEquals(podSuccessLifecycleStates, actualLifecycleStates);
+  }
+
+  @Test
+  public void testWithMockedEvents() throws Exception {
+    ApiClient apiClient = ClientBuilder.kubeconfig(kubeConfig).build();
+    FileBackedWatch<V1Pod> fileBackedWatch = new FileBackedWatch<>(
+        apiClient.getJSON(),
+        new TypeToken<Response<V1Pod>>() {}.getType(),
+        Paths.get(JSON_EVENTS_FILE_PATH));
+    kubeWatchWithMockListener.processPodWatchEvents(fileBackedWatch);
+  }
+
+  @Test
+  public void testPodWatch() throws Exception {
+    kubeWatchWithMockListener.initializePodWatch();
+    kubeWatchWithMockListener.startPodWatch();
+  }
 
   private static class FileBackedWatch<T> extends Watch<T> {
     private final BufferedReader reader;
@@ -150,68 +212,6 @@ public class KubernetesWatchTest {
     public void onPodUnexpected(AzPodStatusMetadata event) {
       logStatusForPod(event);
     }
-  }
-
-  // todo: sanitize and package json files as resources
-  private static String KUBE_CONFIG_PATH = "/Users/sshardoo/.kube/proxy-config";
-  private static String JSON_EVENTS_FILE_PATH = "/Users/sshardoo/source/misc/sample5-pods.json";
-  private static String POD_WITH_LIFECYCLE_SUCCESS = "fc-dep-holdem6-280";
-  private static String POD_WITH_LIFECYCLE_INIT_FAILURE = "";
-  private static String POD_WITH_LIFECYCLE_APP_FAILURE = "";
-  private static String POD_WTIH_COMPLETED_STATE = "fc-dep-holdem6-238";
-
-  private KubeConfig kubeConfig;
-  private KubernetesWatch kubeWatchWithMockListener;
-
-  @Before
-  public void setUp() throws Exception {
-    this.kubeConfig = KubeConfig.loadKubeConfig(
-        Files.newBufferedReader(Paths.get(KUBE_CONFIG_PATH), Charset.defaultCharset()));
-    this.kubeWatchWithMockListener = new KubernetesWatch(kubeConfig, new MockPodWatchEventListener(), NAMESPACE,
-        null);
-  }
-
-  @Test
-  public void testDriverWithStatusLoggingListener() throws Exception {
-    StatusLoggingListener podStatusListener = new StatusLoggingListener();
-    AzPodStatusDriver azPodStatusDriver = new AzPodStatusDriver();
-    azPodStatusDriver.registerAzPodStatusListener(podStatusListener);
-    KubernetesWatch watchWithLoggingListener = new KubernetesWatch(kubeConfig,
-        azPodStatusDriver,
-        NAMESPACE,
-        null);
-    ApiClient apiClient = ClientBuilder.kubeconfig(kubeConfig).build();
-    FileBackedWatch<V1Pod> fileBackedWatch = new FileBackedWatch<>(
-        apiClient.getJSON(),
-        new TypeToken<Response<V1Pod>>() {}.getType(),
-        Paths.get(JSON_EVENTS_FILE_PATH));
-    watchWithLoggingListener.processPodWatchEvents(fileBackedWatch);
-    azPodStatusDriver.shutdown();
-
-    ConcurrentMap<String, Queue<AzPodStatus>> statusLogMap = podStatusListener.getStatusLogMap();
-    StatusLoggingListener.logDebugStatusMap(statusLogMap);
-
-    List<AzPodStatus> actualLifecycleStates =
-        statusLogMap.get(POD_WITH_LIFECYCLE_SUCCESS).stream()
-        .distinct().collect(Collectors.toList());
-
-    Assert.assertEquals(podSuccessLifecycleStates, actualLifecycleStates);
-  }
-
-  @Test
-  public void testWithMockedEvents() throws Exception {
-    ApiClient apiClient = ClientBuilder.kubeconfig(kubeConfig).build();
-    FileBackedWatch<V1Pod> fileBackedWatch = new FileBackedWatch<>(
-        apiClient.getJSON(),
-        new TypeToken<Response<V1Pod>>() {}.getType(),
-        Paths.get(JSON_EVENTS_FILE_PATH));
-    kubeWatchWithMockListener.processPodWatchEvents(fileBackedWatch);
-  }
-
-  @Test
-  public void testPodWatch() throws Exception {
-    kubeWatchWithMockListener.initializePodWatch();
-    kubeWatchWithMockListener.startPodWatch();
   }
 
   private static class MockPodWatchEventListener implements RawPodWatchEventListener {

@@ -1,4 +1,4 @@
-package azkaban.executor.container;
+package azkaban.executor.container.watch;
 
 import static com.google.common.base.Preconditions.checkState;
 import static java.lang.String.format;
@@ -9,6 +9,7 @@ import azkaban.executor.ExecutionControllerUtils;
 import azkaban.executor.ExecutorLoader;
 import azkaban.executor.ExecutorManagerException;
 import azkaban.executor.Status;
+import azkaban.executor.container.ContainerizedImpl;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.function.Function;
@@ -107,12 +108,12 @@ public class FlowStatusUpdatingListener implements AzPodStatusListener {
    * specific value or is within a contained in a given set of values.
    *
    * <p> Note:
-   * Unfortunately most (if not all) of the Flow status updates in Azkaban completely disregard
+   * Unfortunately many (if not all) of the Flow status updates in Azkaban don't fully enforce
    * the Flow lifecycle state-machine and {@link ExecutionControllerUtils.finalizeFlow} used
    * within this method is no exception. It will simply finalize the flow (as failed) even if the
    * flow status is in a finalized state in the Db. <br>
    * This could be a problem for this listener implementation as occasionally more than one thread
-   * could try to update the state of a the same flow in db. Although it's not any worse than how
+   * could try to update the state of the same flow in db. Although it's not any worse than how
    * the rest of Azkaban already behaves, we should fix the behavior at least during the
    * finalization of flows.
    * todo: Add utility method to atomically test-and-finalize a flow from non-final to failed state.

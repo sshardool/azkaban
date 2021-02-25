@@ -1,11 +1,11 @@
-package azkaban.executor.container;
+package azkaban.executor.container.watch;
 
 /**
- * Provides callback methods for processing of {@code AzPodStatus} states.
- * Each of the methods here directly corresponds to an enum value in{@code AzPodStatus}
+ * Provides callback methods for processing of {@link AzPodStatus} states.
+ * Each of the methods here directly corresponds to an enum value in{@link AzPodStatus}
  *
  * Method implementations are expected to be idempotent as it's possible to receive different
- * events which all map to the same enum value in {@code AzPodStatus}
+ * events which all map to the same enum value in {@link AzPodStatus}
  *
  */
 public interface AzPodStatusListener {
